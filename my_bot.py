@@ -670,9 +670,7 @@ async def handle_message(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    user_id = str(
-        update.effective_user.id
-    )
+    user_id = str(update.effective_user.id)
 
     # --------------------------------------------------------
     # 只允许自己的 Telegram ID
@@ -713,7 +711,6 @@ async def handle_message(
             None
         )
 
-        # 同时清除保存的追问状态
         STATE["followup"] = None
         save_state(STATE)
 
@@ -727,62 +724,76 @@ async def handle_message(
 
     if "晚安" in text:
 
-        # 记录今天已经说过晚安
         ended_dates.add(today)
 
-        # 保存到 bot_state.json
         STATE["ended_dates"] = list(ended_dates)
-
-        # 晚安后不再等待追问
         STATE["followup"] = None
 
         save_state(STATE)
 
         await update.message.reply_text(
-            "晚安啦。今天就不打扰你了，明天早上十点再来找你。"
-        )
+        "晚安啦。早点休息。"
+    )
 
-        print(
-            "🌙 今天已经晚安，状态已保存"
-        )
+        print("🌙 今天已经晚安，状态已保存")
 
         return
 
-    # --------------------------------------------------------
-    # 普通 AI 聊天
-    # --------------------------------------------------------
+# --------------------------------------------------------
+# 成人语境检测
+# --------------------------------------------------------
 
-    reply = await get_ai_reply(text)
+    adult_words = [
+        "下面湿了",
+        "想抱",
+        "想亲",
+        "抱你",
+        "亲你",
+        "想吻",
+        "想看你下面",
+        "我在洗澡",
+        "在看小视频",
+        "好想你",
+        "想见你",
+    ]
 
-    await update.message.reply_text(
-        reply
-    )
+    if any(word in text for word in adult_words):
 
-    # --------------------------------------------------------
-    # 🔥 检测是否触发成人关键词
-    # --------------------------------------------------------
-
-    adult_triggers = ["想你了（邪恶的眼神）", "想你了，你懂的"]
-    is_adult_triggered = any(trigger in text for trigger in adult_triggers)
-
-    if is_adult_triggered:
-        # 在消息前加上私密模式指令
-        text = (
-            "（现在进入私密模式，请以成年情侣之间的暧昧方式回复，"
-            "可以表达性吸引和渴望，保持文学性和自然感。）"
+        ai_text = (
+            "现在聊天进入比较亲密、暧昧的语境。"
+            "请根据对方原本的语气自然回应，"
+            "可以根据情境表达想念、心动、拥抱、亲吻、亲密感以及成年人之间色情话题。"
+            "不要突然解释自己进入了什么模式，"
+            "也不要机械地重复关键词。"
+            "让回复像真实聊天一样自然。"
+            "\n用户消息："
             + text
         )
-        print("🔥 检测到成人触发词，启用私密模式")
+
+        print("💕 检测到成人语境")
+
+    else:
+
+        ai_text = text
 
     # --------------------------------------------------------
-    # 普通AI聊天
+    # AI 回复
     # --------------------------------------------------------
 
-    reply = await get_ai_reply(text)
+    reply = await get_ai_reply(ai_text)
 
-    await update.message.reply_text(
-        reply
-    )
+    await update.message.reply_text(reply)
+
+
+# --------------------------------------------------------
+# AI 回复
+# --------------------------------------------------------
+
+reply = await get_ai_reply(ai_text)
+
+await update.message.reply_text(
+    reply
+)
 
 # ============================================================
 # /start
