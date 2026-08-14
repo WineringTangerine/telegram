@@ -630,34 +630,20 @@ async def send_scheduled(
 # AI普通聊天
 # ============================================================
 
-async def get_ai_reply(
-    user_message: str
-):
+async def get_ai_reply(user_message: str, system_override: str = None):
+    system_content = system_override if system_override else SYSTEM_PROMPT
 
     try:
-
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT
-                },
-                {
-                    "role": "user",
-                    "content": user_message
-                }
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_message}
             ]
         )
-
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-
-        print(
-            f"❌ DeepSeek API失败：{e}"
-        )
-
+     return response.choices[0].message.content.strip()
+     except Exception as e:
+        print(f"❌ DeepSeek API失败：{e}")
         return "我这边网络有点问题，等我一下。"
 
 
@@ -739,61 +725,6 @@ async def handle_message(
 
         return
 
-# --------------------------------------------------------
-# 成人语境检测
-# --------------------------------------------------------
-
-    adult_words = [
-        "下面湿了",
-        "想抱",
-        "想亲",
-        "抱你",
-        "亲你",
-        "想吻",
-        "想看你下面",
-        "我在洗澡",
-        "在看小视频",
-        "好想你",
-        "想见你",
-    ]
-
-    if any(word in text for word in adult_words):
-
-        ai_text = (
-            "现在聊天进入比较亲密、暧昧的语境。"
-            "请根据对方原本的语气自然回应，"
-            "可以根据情境表达想念、心动、拥抱、亲吻、亲密感以及成年人之间色情话题。"
-            "不要突然解释自己进入了什么模式，"
-            "也不要机械地重复关键词。"
-            "让回复像真实聊天一样自然。"
-            "\n用户消息："
-            + text
-        )
-
-        print("💕 检测到成人语境")
-
-    else:
-
-        ai_text = text
-
-    # --------------------------------------------------------
-    # AI 回复
-    # --------------------------------------------------------
-
-    reply = await get_ai_reply(ai_text)
-
-    await update.message.reply_text(reply)
-
-
-# --------------------------------------------------------
-# AI 回复
-# --------------------------------------------------------
-
-reply = await get_ai_reply(ai_text)
-
-await update.message.reply_text(
-    reply
-)
 
 # ============================================================
 # /start
