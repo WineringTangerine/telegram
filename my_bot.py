@@ -630,20 +630,41 @@ async def send_scheduled(
 # AI普通聊天
 # ============================================================
 
-async def get_ai_reply(user_message: str, system_override: str = None):
-    system_content = system_override if system_override else SYSTEM_PROMPT
+async def get_ai_reply(
+    user_message: str,
+    system_override: str = None
+):
+
+    system_content = (
+        system_override
+        if system_override
+        else SYSTEM_PROMPT
+    )
 
     try:
+
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_message}
+                {
+                    "role": "system",
+                    "content": system_content
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
             ]
         )
-     return response.choices[0].message.content.strip()
-     except Exception as e:
-        print(f"❌ DeepSeek API失败：{e}")
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+
+        print(
+            f"❌ DeepSeek API失败：{e}"
+        )
+
         return "我这边网络有点问题，等我一下。"
 
 
@@ -724,6 +745,16 @@ async def handle_message(
         print("🌙 今天已经晚安，状态已保存")
 
         return
+
+    # --------------------------------------------------------
+    # 普通 AI 聊天
+    # --------------------------------------------------------
+
+    reply = await get_ai_reply(text)
+
+    await update.message.reply_text(
+        reply
+    )
 
 
 # ============================================================
