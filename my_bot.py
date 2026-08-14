@@ -29,12 +29,71 @@ BJ_TZ = ZoneInfo("Asia/Shanghai")
 # 全局状态
 # ============================================================
 
-# 记录哪些日期已经说过“晚安”
 import json
-
-# 当前等待回复的追问任务
-# 一次只允许存在一个
 import os
+
+# 状态文件
+STATE_FILE = "bot_state.json"
+
+# 一次只允许存在一个追问任务
+PENDING_FOLLOWUP_KEY = "pending_followup"
+
+
+def load_state():
+    """读取 Bot 上一次保存的状态"""
+
+    if not os.path.exists(STATE_FILE):
+        return {
+            "ended_dates": [],
+            "followup": None
+        }
+
+    try:
+        with open(
+            STATE_FILE,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            return json.load(f)
+
+    except Exception as e:
+        print(f"⚠️ 读取状态文件失败：{e}")
+
+        return {
+            "ended_dates": [],
+            "followup": None
+        }
+
+
+def save_state(state):
+    """保存 Bot 当前状态"""
+
+    try:
+        with open(
+            STATE_FILE,
+            "w",
+            encoding="utf-8"
+        ) as f:
+            json.dump(
+                state,
+                f,
+                ensure_ascii=False,
+                indent=4
+            )
+
+    except Exception as e:
+        print(f"⚠️ 保存状态文件失败：{e}")
+
+
+# ============================================================
+# 初始化状态
+# ============================================================
+
+STATE = load_state()
+
+ended_dates = set(
+    STATE.get("ended_dates", [])
+)
 
 
 # ============================================================
@@ -496,7 +555,7 @@ def schedule_followup(
     # 创建任务
     job = context.job_queue.run_once(
         callback=send_followup,
-        when=followup_time,
+        when=3600,
         data=now.date().isoformat(),
         name=f"followup_{hour}"
     )
@@ -642,27 +701,62 @@ async def handle_message(
     # --------------------------------------------------------
 
     pending_job = context.bot_data.get(
-    PENDING_FOLLOWUP_KEY
-)
-
-if pending_job:
-
-    pending_job.schedule_removal()
-
-    context.bot_data.pop(
-        PENDING_FOLLOWUP_KEY,
-        None
+        PENDING_FOLLOWUP_KEY
     )
 
-    STATE["followup"] = None
-    save_state(STATE)
+    if pending_job:
 
-    print(
-        "🙋 用户已经回复，取消追问任务"
-    )
+        pending_job.schedule_removal()
+
+        context.bot_data.pop(
+            PENDING_FOLLOWUP_KEY,
+            None
+        )
+
+        # 同时清除保存的追问状态
+        STATE["followup"] = None
+        save_state(STATE)
+
+        print(
+            "🙋 用户已经回复，取消追问任务"
+        )
+
+    # --------------------------------------------------------
+    # 检测“晚安”
+    # --------------------------------------------------------
+
+    if "晚安" in text:
+
+        # 记录今天已经说过晚安
+        ended_dates.add(today)
+
+        # 保存到 bot_state.json
+        STATE["ended_dates"] = list(ended_dates)
+
+        # 晚安后不再等待追问
+        STATE["followup"] = None
+
+        save_state(STATE)
+
+        await update.message.reply_text(
+            "晚安啦。今天就不打扰你了，明天早上十点再来找你。"
+        )
+
+        print(
+            "🌙 今天已经晚安，状态已保存"
         )
 
         return
+
+    # --------------------------------------------------------
+    # 普通 AI 聊天
+    # --------------------------------------------------------
+
+    reply = await get_ai_reply(text)
+
+    await update.message.reply_text(
+        reply
+    )
 
     # --------------------------------------------------------
     # 🔥 检测是否触发成人关键词
@@ -723,7 +817,62 @@ def main():
         .token(TELEGRAM_TOKEN)
         .build()
     )
+    # --------------------------------------------------------
+    # 恢复 Bot 重启前尚未完成的一小时追问
+    # --------------------------------------------------------
 
+    followup_state = STATE.get("followup")
+
+    if followup_state:
+
+        try:
+
+            followup_time = datetime.datetime.fromisoformat(
+                followup_state["followup_time"]
+            )
+
+            now = datetime.datetime.now(BJ_TZ)
+
+            if followup_time > now:
+
+                remaining_seconds = (
+                    followup_time - now
+                ).total_seconds()
+
+                job = app.job_queue.run_once(
+                    callback=send_followup,
+                    when=remaining_seconds,
+                    data=followup_state["date"],
+                    name="restored_followup"
+                )
+
+                app.bot_data[
+                    PENDING_FOLLOWUP_KEY
+                ] = job
+
+                print(
+                    "🔄 已恢复未完成的追问任务："
+                    f"{followup_time.strftime('%Y-%m-%d %H:%M')}"
+                )
+
+            else:
+
+                STATE["followup"] = None
+                save_state(STATE)
+
+                print(
+                    "⏭️ 上一次追问时间已经过去，不补发"
+                )
+
+        except Exception as e:
+
+            print(
+                f"⚠️ 恢复追问任务失败：{e}"
+            )
+
+            STATE["followup"] = None
+            save_state(STATE)
+            
     # --------------------------------------------------------
     # 命令
     # --------------------------------------------------------
