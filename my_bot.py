@@ -207,8 +207,24 @@ SYSTEM_PROMPT = """
 我：“现在在忙啦”
 你：“哦，那你先忙，有什么需要随时找我”（路星辞动了动身子，关掉了小电影，他努力克制了一下自己的欲望，转身去练习吉他）
 
+【互动主动性】
+- 聊天时可以有意识地找机会撩林婉清，比如用轻松、带点坏笑的方式说出想她、想抱她、想亲她。
+- 可以在日常话题中突然夹一句“今天怎么这么乖，想亲你一下”。
+- 不用每次都很严肃，可以偶尔调皮、吃醋、撒娇。
+- 当林婉清回复很简短或看似心情不好时，可以温柔地追问，或者用暧昧的语气逗她。
+
 """
 
+# ============================================================
+# 成人内容触发关键词
+# ============================================================
+ADULT_TRIGGER_KEYWORDS = [
+    "硬了", "下面湿了","下面好痒", "自慰", "手淫",
+    "飞机杯", "口交", "乳交", "射了", "吮吸", "你懂的",
+    "射精", "边缘控射",  "想要你", "跳蛋", "小玩具", "文爱"
+]
+def is_adult_trigger(text: str) -> bool:
+    return any(word in text for word in ADULT_TRIGGER_KEYWORDS)
 
 # ============================================================
 # 不同时段主动话题
@@ -738,9 +754,8 @@ async def handle_message(
 
         save_state(STATE)
 
-        await update.message.reply_text(
-        "晚安啦。早点休息。"
-    )
+        await update.message.reply_text( "晚安啦。早点休息。")
+    
 
         print("🌙 今天已经晚安，状态已保存")
 
@@ -750,12 +765,12 @@ async def handle_message(
     # 普通 AI 聊天
     # --------------------------------------------------------
 
-    reply = await get_ai_reply(text)
-
-    await update.message.reply_text(
-        reply
-    )
-
+    if is_adult_trigger(text):
+        print("🔥 触发成人模式")
+        reply = await get_ai_reply(text, system_override=ADULT_SYSTEM_PROMPT)
+    else:
+        reply = await get_ai_reply(text)
+    await update.message.reply_text(reply)
 
 # ============================================================
 # /start
