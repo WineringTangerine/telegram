@@ -20,6 +20,8 @@ from openai import OpenAI
 import datetime
 import random
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import (
